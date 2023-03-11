@@ -1,5 +1,5 @@
 # curl
-*cu*riosity-based *r*einforcement *l*earning for robot systems
+**cu**riosity-based **r**einforcement **l**earning for robot systems
 
 ## Setting up Docker
 Install `docker compose` (NOT `docker-compose) according to the instructions [here](https://docs.docker.com/compose/install/).
