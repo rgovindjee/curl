@@ -2,9 +2,9 @@
 *cu*riosity-based *r*einforcement *l*earning for robot systems
 
 ## Setting up Docker
-Install `docker compose` (NOT `docker-compose) according to the instructions (here)[https://docs.docker.com/compose/install/].
+Install `docker compose` (NOT `docker-compose) according to the instructions [here](https://docs.docker.com/compose/install/).
 
-To be able to run Docker without typing `sudo`, follow the instructions (here)[https://docs.docker.com/engine/install/linux-postinstall/].
+To be able to run Docker without typing `sudo`, follow the instructions [here](https://docs.docker.com/engine/install/linux-postinstall/).
 
 ## Building the container
 
