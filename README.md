@@ -5,9 +5,9 @@
 
 To build the container, run `docker compose build`.
 
-Once the container is built, run it with `docker run -it --rm -p 6080:80 curl-rl-proj`.
+Once the container is built, run it with `docker run -it --rm -p 6080:80 --name rl-proj curl-rl-proj`.
 
-To open a shell within the container, `docker exec -it rl_proj bash`.
+To open a shell within the container, `docker exec -it rl-proj bash`.
 
 In any web browser, you should be able to navigate to `localhost:6080` or `127.0.0.1:6080` and see a desktop environment.
 
