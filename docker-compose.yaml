@@ -11,4 +11,6 @@ services:
       - DISPLAY=$DISPLAY
     tty: true
     privileged: true
-    network_mode: "host"
+    #network_mode: "host"
+    ports:
+      - "127.0.0.1:6080:80"
