@@ -5,6 +5,7 @@ services:
     build: .
     volumes:
       - ./src:/root/src
+      - ./paper_code_pyTorch_updated_packages:/root/paper_code_pyTorch_updated_packages
       - /tmp/.X11-unix:/tmp/.X11-unix
     environment:
       - DISPLAY=$DISPLAY
