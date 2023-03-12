@@ -15,3 +15,9 @@ RUN sudo apt-get install -y python3-pip vim
 
 # Install python packages
 RUN pip3 install torch numpy
+RUN pip3 install --upgrade pip  # Need to update pip to install opencv
+# Use < version 4.3 to avoid having to rebuild opencv C++ from source.
+RUN pip3 install opencv-python<4.3 -v # Chnage to opencv-contrib-python if needed.
+RUN pip3 install gym-super-mario-bros Pillow # For super mario with gymnasium
+RUN pip3 install tensorboardX # For super mario with gymnasium
+RUN pip3 install gym[atari,accept-rom-license]==0.21.0
