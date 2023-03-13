@@ -55,14 +55,14 @@ def main():
     sticky_action = False
     life_done = default_config.getboolean('LifeDone')
 
-    agent = RNDAgent
-
     if default_config['EnvType'] == 'atari':
         env_type = AtariEnvironment
     elif default_config['EnvType'] == 'mario':
         env_type = MarioEnvironment
     else:
         raise NotImplementedError
+
+    agent = ICMAgent
 
     agent = agent(
         input_size,
