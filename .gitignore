@@ -1,3 +1,6 @@
 *.pyc
 */runs/*
 */__pycache__/*
+*.swp
+*.model
+*.icm
