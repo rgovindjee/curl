@@ -94,7 +94,9 @@ class MaxAndSkipEnv(gym.Wrapper):
         for i in range(self._skip):
             obs, reward, done, info = self.env.step(action)
             if self.is_render:
-                self.env.render()
+                # Deprecated, do when making gym
+                #self.env.render()
+                pass
             if i == self._skip - 2:
                 self._obs_buffer[0] = obs
             if i == self._skip - 1:
@@ -261,7 +263,9 @@ class MarioEnvironment(Process):
         while True:
             action = self.child_conn.recv()
             if self.is_render:
-                self.env.render()
+                # Deprecated, do when making gym
+                #self.env.render()
+                pass
 
             obs, reward, done, info = self.env.step(action)
 

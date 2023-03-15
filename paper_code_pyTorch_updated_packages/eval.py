@@ -16,9 +16,9 @@ def main():
     env_type = default_config['EnvType']
 
     if env_type == 'mario':
-        env = JoypadSpace(gym_super_mario_bros.make(env_id), COMPLEX_MOVEMENT)
+        env = JoypadSpace(gym_super_mario_bros.make(env_id, render_mode="human"), COMPLEX_MOVEMENT)
     elif env_type == 'atari':
-        env = gym.make(env_id)
+        env = gym.make(env_id, render_mode="human")
     else:
         raise NotImplementedError
     input_size = env.observation_space.shape  # 4
@@ -31,8 +31,8 @@ def main():
 
     is_render = True
     model_path = 'models/{}.model'.format(env_id)
-    predictor_path = 'models/{}.pred'.format(env_id)
-    target_path = 'models/{}.target'.format(env_id)
+    #predictor_path = 'models/{}.pred'.format(env_id)
+    #target_path = 'models/{}.target'.format(env_id)
 
     use_cuda = False
     use_gae = default_config.getboolean('UseGAE')
@@ -85,12 +85,12 @@ def main():
     print('Loading Pre-trained model....')
     if use_cuda:
         agent.model.load_state_dict(torch.load(model_path))
-        agent.rnd.predictor.load_state_dict(torch.load(predictor_path))
-        agent.rnd.target.load_state_dict(torch.load(target_path))
+        #agent.icm.predictor.load_state_dict(torch.load(predictor_path))
+        #agent.icm.target.load_state_dict(torch.load(target_path))
     else:
         agent.model.load_state_dict(torch.load(model_path, map_location='cpu'))
-        agent.rnd.predictor.load_state_dict(torch.load(predictor_path, map_location='cpu'))
-        agent.rnd.target.load_state_dict(torch.load(target_path, map_location='cpu'))
+        #agent.icm.predictor.load_state_dict(torch.load(predictor_path, map_location='cpu'))
+        #agent.icm.target.load_state_dict(torch.load(target_path, map_location='cpu'))
     print('End load...')
 
     works = []
@@ -112,7 +112,7 @@ def main():
     intrinsic_reward_list = []
     while not rd:
         steps += 1
-        actions, value_ext, value_int, policy = agent.get_action(np.float32(states) / 255.)
+        actions, value, policy = agent.get_action(np.float32(states) / 255.)
 
         for parent_conn, action in zip(parent_conns, actions):
             parent_conn.send(action)
