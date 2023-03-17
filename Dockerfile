@@ -34,4 +34,5 @@ RUN pip3 install gym[atari,accept-rom-license] # seemingly not compatible with p
 RUN pip3 install gym_super_mario_bros
 RUN pip3 install Pillow # For super mario with gymnasium
 RUN pip3 install tensorboardX # For super mario with gymnasium
+RUN pip3 install gymnasium[classic-control] #for basic usage cartpole
 
