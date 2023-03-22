@@ -94,9 +94,7 @@ class MaxAndSkipEnv(gym.Wrapper):
         for i in range(self._skip):
             obs, reward, done, info = self.env.step(action)
             if self.is_render:
-                # Deprecated, do when making gym
-                #self.env.render()
-                pass
+                self.env.render()
             if i == self._skip - 2:
                 self._obs_buffer[0] = obs
             if i == self._skip - 1:
@@ -202,7 +200,7 @@ class AtariEnvironment(Environment):
                 self.history = self.reset()
 
             self.child_conn.send(
-                [self.history[:, :, :], reward, force_done, done, log_reward])
+                [self.history[:, :, :], reward, force_done, done, log_reward,self.episode]) #priya added self.episode to send current episode
 
     def reset(self):
         self.last_action = 0
@@ -263,9 +261,7 @@ class MarioEnvironment(Process):
         while True:
             action = self.child_conn.recv()
             if self.is_render:
-                # Deprecated, do when making gym
-                #self.env.render()
-                pass
+                self.env.render()
 
             obs, reward, done, info = self.env.step(action)
 
@@ -308,7 +304,7 @@ class MarioEnvironment(Process):
 
                 self.history = self.reset()
 
-            self.child_conn.send([self.history[:, :, :], r, force_done, done, log_reward])
+            self.child_conn.send([self.history[:, :, :], r, force_done, done, log_reward,self.episode])
 
     def reset(self):
         self.last_action = 0
