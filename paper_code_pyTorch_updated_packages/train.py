@@ -130,12 +130,12 @@ def main():
             parent_conn.send(action)
 
         for parent_conn in parent_conns:
-            s, r, d, rd, lr, episodeNo = parent_conn.recv() #priya added episodeNo received here
+            s, r, d, rd, lr = parent_conn.recv()
             next_obs.append(s[:])
+
     next_obs = np.stack(next_obs)
     obs_rms.update(next_obs)
     print('End to initalize...')
-
     while True:
         total_state, total_reward, total_done, total_next_state, total_action, total_int_reward, total_next_obs, total_values, total_policy = \
             [], [], [], [], [], [], [], [], []
@@ -151,7 +151,7 @@ def main():
 
             next_states, rewards, dones, real_dones, log_rewards, next_obs = [], [], [], [], [], []
             for parent_conn in parent_conns:
-                s, r, d, rd, lr, episodeNo = parent_conn.recv()
+                s, r, d, rd, lr = parent_conn.recv()
                 next_states.append(s)
                 rewards.append(r)
                 dones.append(d)
@@ -239,20 +239,12 @@ def main():
                           target, total_action,
                           adv,
                           total_policy)
-        
-        #priya added episode terminating condition inside while loop so stop at 6
-        if episodeNo > 5:
-            print('model stopped training :{}'.format(episodeNo))
-            torch.save(agent.model.state_dict(), model_path) #to save current model state priya added
-            torch.save(agent.icm.state_dict(), icm_path) #to save icm path priya 
-            break
 
-        if global_step % (num_worker * num_step * 100) == 0:
+        if global_step % (num_worker * num_step * 1) == 0: #priya changed 100 to 1
             print('Now Global Step :{}'.format(global_step))
             torch.save(agent.model.state_dict(), model_path)
             torch.save(agent.icm.state_dict(), icm_path)
-        
-        
+            break #priya added break
 
 
 if __name__ == '__main__':
