@@ -200,7 +200,7 @@ class AtariEnvironment(Environment):
                 self.history = self.reset()
 
             self.child_conn.send(
-                [self.history[:, :, :], reward, force_done, done, log_reward,self.episode]) #priya added self.episode to send current episode
+                [self.history[:, :, :], reward, force_done, done, log_reward])
 
     def reset(self):
         self.last_action = 0
