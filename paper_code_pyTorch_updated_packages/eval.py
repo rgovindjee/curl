@@ -3,6 +3,7 @@ from envs import *
 from utils import *
 from config import *
 from torch.multiprocessing import Pipe
+import os
 
 from tensorboardX import SummaryWriter
 
@@ -108,35 +109,39 @@ def main():
 
     steps = 0
     rall = 0
-    rd = False
+    done = False
     intrinsic_reward_list = []
-    while not rd:
+    while not done:
         steps += 1
         actions, value, policy = agent.get_action(np.float32(states) / 255.)
 
         for parent_conn, action in zip(parent_conns, actions):
             parent_conn.send(action)
 
-        next_states, rewards, dones, real_dones, log_rewards, next_obs = [], [], [], [], [], []
+        next_states = []
         for parent_conn in parent_conns:
-            s, r, d, rd, lr = parent_conn.recv()
-            rall += r
-            next_states = s.reshape([1, 4, 84, 84])
-            next_obs = s[3, :, :].reshape([1, 1, 84, 84])
+            history, reward, force_done, done, log_reward = parent_conn.recv()
+            rall += reward
+            next_states.append(history.reshape([4, 84, 84]))
+        next_states = np.stack(next_states)
 
         # total reward = int reward + ext Reward
-        intrinsic_reward = agent.compute_intrinsic_reward(next_obs)
+        intrinsic_reward = agent.compute_intrinsic_reward(states, next_states, actions)
         intrinsic_reward_list.append(intrinsic_reward)
         states = next_states[:, :, :, :]
 
-        if rd:
+        if done:
+            print("Saving reward data to file...")
             intrinsic_reward_list = (intrinsic_reward_list - np.mean(intrinsic_reward_list)) / np.std(
                 intrinsic_reward_list)
             with open('int_reward', 'wb') as f:
                 pickle.dump(intrinsic_reward_list, f)
             steps = 0
             rall = 0
-
+    print("Done evaluating, closing environments")
+    for p in parent_conns:
+        p.send("SIGTERM")  # Hack to kill blocking env processes, should be a more graceful way
+        p.close()
 
 if __name__ == '__main__':
     main()

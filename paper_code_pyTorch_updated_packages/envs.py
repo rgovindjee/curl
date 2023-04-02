@@ -1,4 +1,4 @@
-import gym
+import gymnasium as gym
 import cv2
 
 import numpy as np
@@ -70,9 +70,10 @@ class NoopResetEnv(gym.Wrapper):
         assert noops > 0
         obs = None
         for _ in range(noops):
-            obs, _, done, _ = self.env.step(self.noop_action)
-            if done:
-                obs = self.env.reset(**kwargs)
+            obs, reward, terminated, truncated, info = self.env.step(self.noop_action)
+            if terminated or truncated:
+                # Assuming env is a v26 or newer gym env that returns two args
+                obs, info = self.env.reset(**kwargs)
         return obs
 
     def step(self, ac):
@@ -92,7 +93,8 @@ class MaxAndSkipEnv(gym.Wrapper):
         total_reward = 0.0
         done = None
         for i in range(self._skip):
-            obs, reward, done, info = self.env.step(action)
+            obs, reward, terminated, truncated, info = self.env.step(action)
+            done = terminated or truncated
             if self.is_render:
                 # Deprecated, do when making gym
                 #self.env.render()
@@ -111,7 +113,8 @@ class MaxAndSkipEnv(gym.Wrapper):
         return max_frame, total_reward, done, info
 
     def reset(self, **kwargs):
-        return self.env.reset(**kwargs)
+        obs = self.env.reset(**kwargs)
+        return obs
 
 
 class MontezumaInfoWrapper(gym.Wrapper):
@@ -126,17 +129,19 @@ class MontezumaInfoWrapper(gym.Wrapper):
         return int(ram[self.room_address])
 
     def step(self, action):
-        obs, rew, done, info = self.env.step(action)
+        obs, reward, terminated, truncated, info = self.env.step(action)
+        done = terminated or truncated
         self.visited_rooms.add(self.get_current_room())
         if done:
             if 'episode' not in info:
                 info['episode'] = {}
             info['episode'].update(visited_rooms=copy(self.visited_rooms))
             self.visited_rooms.clear()
-        return obs, rew, done, info
+        return obs, reward, done, info
 
     def reset(self):
-        return self.env.reset()
+        obs = self.env.reset()
+        return obs
 
 
 class AtariEnvironment(Environment):
@@ -155,6 +160,8 @@ class AtariEnvironment(Environment):
         self.env = MaxAndSkipEnv(NoopResetEnv(gym.make(env_id)), is_render)
         if 'Montezuma' in env_id:
             self.env = MontezumaInfoWrapper(self.env, room_address=3 if 'Montezuma' in env_id else 1)
+        # TODO(rgg): make all gym environments use v26 for step() and reset() and remove compatibility layer
+        self.env = gym.wrappers.EnvCompatibility(self.env, is_render)
         self.env_id = env_id
         self.is_render = is_render
         self.env_idx = env_idx
@@ -174,42 +181,50 @@ class AtariEnvironment(Environment):
     def run(self):
         super(AtariEnvironment, self).run()
         while True:
-            action = self.child_conn.recv()
+            try:
+                action = self.child_conn.recv()
+                if action == "SIGTERM": 
+                    raise Exception("Received termination signal")
 
-            if 'Breakout' in self.env_id:
-                action += 1
+                if 'Breakout' in self.env_id:
+                    action += 1
 
-            s, reward, done, info = self.env.step(action)
+                s, reward, terminated, truncated, info = self.env.step(action)
+                done = terminated or truncated
 
-            if max_step_per_episode < self.steps:
-                done = True
+                if max_step_per_episode < self.steps:
+                    done = True
 
-            log_reward = reward
-            force_done = done
+                log_reward = reward
+                force_done = done
 
-            self.history[:3, :, :] = self.history[1:, :, :]
-            self.history[3, :, :] = self.pre_proc(s)
+                # Previous 3 frames
+                self.history[:3, :, :] = self.history[1:, :, :]
+                # Current frame
+                self.history[3, :, :] = self.pre_proc(s)
 
-            self.rall += reward
-            self.steps += 1
+                self.rall += reward
+                self.steps += 1
 
-            if done:
-                self.recent_rlist.append(self.rall)
-                print("[Episode {}({})] Step: {}  Reward: {}  Recent Reward: {}  Visited Room: [{}]".format(
-                    self.episode, self.env_idx, self.steps, self.rall, np.mean(self.recent_rlist),
-                    info.get('episode', {}).get('visited_rooms', {})))
+                if done:
+                    self.recent_rlist.append(self.rall)
+                    print("[Episode {}({})] Step: {}  Reward: {}  Recent Reward: {}  Visited Room: [{}]".format(
+                        self.episode, self.env_idx, self.steps, self.rall, np.mean(self.recent_rlist),
+                        info.get('episode', {}).get('visited_rooms', {})))
 
-                self.history = self.reset()
+                    self.history = self.reset()
 
-            self.child_conn.send(
-                [self.history[:, :, :], reward, force_done, done, log_reward])
+                self.child_conn.send(
+                    [self.history[:, :, :], reward, force_done, done, log_reward])
+            except:
+                break
 
     def reset(self):
         self.last_action = 0
         self.steps = 0
         self.episode += 1
         self.rall = 0
-        s = self.env.reset()
+        s, info = self.env.reset()
         self.get_init_state(
             self.pre_proc(s))
         return self.history[:, :, :]
@@ -261,54 +276,59 @@ class MarioEnvironment(Process):
     def run(self):
         super(MarioEnvironment, self).run()
         while True:
-            action = self.child_conn.recv()
-            if self.is_render:
-                # Deprecated, do when making gym
-                #self.env.render()
-                pass
+            try:
+                action = self.child_conn.recv()
+                if action == "SIGTERM": 
+                    raise Exception("Received termination signal")
+                if self.is_render:
+                    # Deprecated, do when making gym
+                    #self.env.render()
+                    pass
 
-            obs, reward, done, info = self.env.step(action)
+                obs, reward, done, info = self.env.step(action)
 
-            # when Mario loses life, changes the state to the terminal
-            # state.
-            if self.life_done:
-                if self.lives > info['life'] and info['life'] > 0:
-                    force_done = True
-                    self.lives = info['life']
+                # when Mario loses life, changes the state to the terminal
+                # state.
+                if self.life_done:
+                    if self.lives > info['life'] and info['life'] > 0:
+                        force_done = True
+                        self.lives = info['life']
+                    else:
+                        force_done = done
+                        self.lives = info['life']
                 else:
                     force_done = done
-                    self.lives = info['life']
-            else:
-                force_done = done
 
-            # reward range -15 ~ 15
-            log_reward = reward / 15
-            self.rall += log_reward
+                # reward range -15 ~ 15
+                log_reward = reward / 15
+                self.rall += log_reward
 
-            r = log_reward
+                r = log_reward
 
-            self.history[:3, :, :] = self.history[1:, :, :]
-            self.history[3, :, :] = self.pre_proc(obs)
+                self.history[:3, :, :] = self.history[1:, :, :]
+                self.history[3, :, :] = self.pre_proc(obs)
 
-            self.steps += 1
+                self.steps += 1
 
-            if done:
-                self.recent_rlist.append(self.rall)
-                print(
-                    "[Episode {}({})] Step: {}  Reward: {}  Recent Reward: {}  Stage: {} current x:{}   max x:{}".format(
-                        self.episode,
-                        self.env_idx,
-                        self.steps,
-                        self.rall,
-                        np.mean(
-                            self.recent_rlist),
-                        info['stage'],
-                        info['x_pos'],
-                        self.max_pos))
+                if done:
+                    self.recent_rlist.append(self.rall)
+                    print(
+                        "[Episode {}({})] Step: {}  Reward: {}  Recent Reward: {}  Stage: {} current x:{}   max x:{}".format(
+                            self.episode,
+                            self.env_idx,
+                            self.steps,
+                            self.rall,
+                            np.mean(
+                                self.recent_rlist),
+                            info['stage'],
+                            info['x_pos'],
+                            self.max_pos))
 
-                self.history = self.reset()
+                    self.history = self.reset()
 
-            self.child_conn.send([self.history[:, :, :], r, force_done, done, log_reward])
+                self.child_conn.send([self.history[:, :, :], r, force_done, done, log_reward])
+            except:
+                break
 
     def reset(self):
         self.last_action = 0
@@ -318,7 +338,8 @@ class MarioEnvironment(Process):
         self.lives = 3
         self.stage = 1
         self.max_pos = 0
-        self.get_init_state(self.env.reset())
+        obs, info = self.env.reset()
+        self.get_init_state(obs)
         return self.history[:, :, :]
 
     def pre_proc(self, X):
