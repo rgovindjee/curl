@@ -4,11 +4,8 @@ from config import *
 from envs import *
 import random
 env_id = "BreakoutNoFrameskip-v4"
-# env = gym.make(env_id, render_mode="human")
-# input_size = env.observation_space.shape  # 4
-# output_size = env.action_space.n - 1  # 2
-input_size = 4
-output_size = 1
+input_size = 4  # Can get these from environment if needed
+output_size = 3
 
 is_render = True
 model_path = 'models/{}.model'.format(env_id)
@@ -46,23 +43,19 @@ agent = ICMAgent(
     use_gae=use_gae,
     use_noisy_net=use_noisy_net
 )
-#agent.model.load_state_dict(torch.load(model_path, map_location='cpu'))
+agent.model.load_state_dict(torch.load(model_path, map_location='cpu'))
 # Wrap environment in some basic I/O functions
-#env = AtariEnvironmentSimple(env_id, is_render)
-env = gym.make(env_id, render_mode="human")
-env.close()
-env.reset()
+env = AtariEnvironmentSimple(env_id, is_render)
 states = np.zeros([num_worker, 4, 84, 84])
 max_steps = 1000  # A few seconds of playtime when rendering
 for i in range(max_steps):
     # Get next action
-    #actions, value, policy = agent.get_action(np.float32(states) / 255.)
-    action = random.randint(0,3)
+    actions, value, policy = agent.get_action(np.float32(states) / 255.)
+    action = actions[0]
     # Run environment for a single step
-    #history, reward, force_done, done, log_reward = env.step(action)
-    s, reward, terminated, truncated, info = env.step(action)
+    history, reward, force_done, done, log_reward = env.step(action)
     # Mirror process with multiple workers even though there is only one here
-    # next_states = []
-    # next_states.append(history.reshape([4, 84, 84]))
-    # next_states = np.stack(next_states)
-    # states = next_states[:, :, :, :]
+    next_states = []
+    next_states.append(history.reshape([4, 84, 84]))
+    next_states = np.stack(next_states)
+    states = next_states[:, :, :, :]
