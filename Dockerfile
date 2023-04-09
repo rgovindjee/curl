@@ -30,7 +30,6 @@ RUN sudo apt-get install -y vim
 RUN pip3 install torch numpy
 # Use < version 4.3 to avoid having to rebuild opencv C++ from source.
 RUN pip3 install "opencv-python<4.3" -v # Chnage to opencv-contrib-python if needed.
-RUN pip3 install gym[atari,accept-rom-license] # seemingly not compatible with python3.7 and associated packages. Replace with gymnasium?
 RUN pip3 install gym_super_mario_bros
 RUN pip3 install Pillow # For super mario with gymnasium
 RUN pip3 install tensorboardX # For super mario with gymnasium

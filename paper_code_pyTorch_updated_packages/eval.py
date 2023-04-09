@@ -108,10 +108,11 @@ def main():
     states = np.zeros([num_worker, 4, 84, 84])
 
     steps = 0
+    max_steps = 5000
     rall = 0
     done = False
     intrinsic_reward_list = []
-    while not done:
+    while steps < max_steps:
         steps += 1
         actions, value, policy = agent.get_action(np.float32(states) / 255.)
 

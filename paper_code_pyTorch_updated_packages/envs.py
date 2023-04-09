@@ -97,8 +97,7 @@ class MaxAndSkipEnv(gym.Wrapper):
             done = terminated or truncated
             if self.is_render:
                 # Deprecated, do when making gym
-                #self.env.render()
-                pass
+                self.env.render()
             if i == self._skip - 2:
                 self._obs_buffer[0] = obs
             if i == self._skip - 1:
@@ -157,7 +156,8 @@ class AtariEnvironment(Environment):
             life_done=True):
         super(AtariEnvironment, self).__init__()
         self.daemon = True
-        self.env = MaxAndSkipEnv(NoopResetEnv(gym.make(env_id)), is_render)
+        render_mode = "human" if is_render else None
+        self.env = MaxAndSkipEnv(NoopResetEnv(gym.make(env_id, render_mode=render_mode)), is_render)
         if 'Montezuma' in env_id:
             self.env = MontezumaInfoWrapper(self.env, room_address=3 if 'Montezuma' in env_id else 1)
         # TODO(rgg): make all gym environments use v26 for step() and reset() and remove compatibility layer
