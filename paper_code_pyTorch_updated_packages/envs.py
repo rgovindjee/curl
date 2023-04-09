@@ -97,7 +97,8 @@ class MaxAndSkipEnv(gym.Wrapper):
             done = terminated or truncated
             if self.is_render:
                 # Deprecated, do when making gym
-                self.env.render()
+                #self.env.render()
+                pass
             if i == self._skip - 2:
                 self._obs_buffer[0] = obs
             if i == self._skip - 1:
@@ -348,6 +349,81 @@ class MarioEnvironment(Process):
         # resize
         x = cv2.resize(x, (self.h, self.w))
 
+        return x
+
+    def get_init_state(self, s):
+        for i in range(self.history_size):
+            self.history[i, :, :] = self.pre_proc(s)
+
+class AtariEnvironmentSimple():
+    def __init__(
+            self,
+            env_id,
+            is_render,
+            history_size=4,
+            h=84,
+            w=84,
+            life_done=True):
+        render_mode = "human" if is_render else None
+        self.env = gym.make(env_id, render_mode=render_mode)
+        self.env_id = env_id
+        self.is_render = is_render
+        self.steps = 0
+        self.episode = 0
+        self.rall = 0
+        self.recent_rlist = deque(maxlen=100)
+
+        self.history_size = history_size
+        self.history = np.zeros([history_size, h, w])
+        self.h = h
+        self.w = w
+
+        self.reset()
+
+    def step(self, action):
+        if 'Breakout' in self.env_id:
+            action += 1
+
+        s, reward, terminated, truncated, info = self.env.step(action)
+        done = terminated or truncated
+
+        if max_step_per_episode < self.steps:
+            done = True
+
+        log_reward = reward
+        force_done = done
+
+        # Previous 3 frames
+        self.history[:3, :, :] = self.history[1:, :, :]
+        # Current frame
+        self.history[3, :, :] = self.pre_proc(s)
+
+        self.rall += reward
+        self.steps += 1
+
+        if done:
+            self.recent_rlist.append(self.rall)
+            print("[Episode {}] Step: {}  Reward: {}  Recent Reward: {}  Visited Room: [{}]".format(
+                self.episode, self.steps, self.rall, np.mean(self.recent_rlist),
+                info.get('episode', {}).get('visited_rooms', {})))
+
+            self.history = self.reset()
+
+        return (self.history[:, :, :], reward, force_done, done, log_reward)
+
+    def reset(self):
+        self.last_action = 0
+        self.steps = 0
+        self.episode += 1
+        self.rall = 0
+        s, info = self.env.reset()
+        self.get_init_state(
+            self.pre_proc(s))
+        return self.history[:, :, :]
+
+    def pre_proc(self, X):
+        X = np.array(Image.fromarray(X).convert('L')).astype('float32')
+        x = cv2.resize(X, (self.h, self.w))
         return x
 
     def get_init_state(self, s):
