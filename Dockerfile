@@ -21,7 +21,7 @@ RUN sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3
 RUN sudo apt-get install -y python3-pip python3.9-distutils
 RUN pip3 install --upgrade pip  # May need to update pip to install opencv
 RUN pip3 install setuptools==46.0.0 # Packages below require this
-RUN pip3 install gym[atari,accept-rom-license] # Replace with gymnasium?
+#RUN pip3 install gym[atari,accept-rom-license] # Removing gym since we want to use only gymnasium
 
 # Install other necessities
 RUN sudo apt-get install -y vim
@@ -33,5 +33,5 @@ RUN pip3 install "opencv-python<4.3" -v # Chnage to opencv-contrib-python if nee
 RUN pip3 install gym_super_mario_bros
 RUN pip3 install Pillow # For super mario with gymnasium
 RUN pip3 install tensorboardX # For super mario with gymnasium
-RUN pip3 install gymnasium[atari,accept-rom-licese,classic-control] #for basic usage cartpole
+RUN pip3 install gymnasium[atari,accept-rom-license,classic-control] #for basic usage cartpole
 
