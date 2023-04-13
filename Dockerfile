@@ -34,4 +34,4 @@ RUN pip3 install gym_super_mario_bros
 RUN pip3 install Pillow # For super mario with gymnasium
 RUN pip3 install tensorboardX # For super mario with gymnasium
 RUN pip3 install gymnasium[atari,accept-rom-license,classic-control] #for basic usage cartpole
-
+RUN pip3 install PyFlyt
