@@ -69,10 +69,9 @@ class NoisyLinear(nn.Module):
 class Flatten(nn.Module):
     def forward(self, input):
         return input.view(input.size(0), -1)
-
-
+        
 class CnnActorCriticNetwork(nn.Module):
-    def __init__(self, input_size, output_size, use_noisy_net=False):
+    def __init__(self, input_size, output_size, use_noisy_net=False, embeddings=None):
         super(CnnActorCriticNetwork, self).__init__()
 
         if use_noisy_net:
@@ -81,31 +80,34 @@ class CnnActorCriticNetwork(nn.Module):
         else:
             linear = nn.Linear
 
-        self.feature = nn.Sequential(
-            nn.Conv2d(
-                in_channels=4,
-                out_channels=32,
-                kernel_size=8,
-                stride=4),
-            nn.LeakyReLU(),
-            nn.Conv2d(
-                in_channels=32,
-                out_channels=64,
-                kernel_size=4,
-                stride=2),
-            nn.LeakyReLU(),
-            nn.Conv2d(
-                in_channels=64,
-                out_channels=64,
-                kernel_size=3,
-                stride=1),
-            nn.LeakyReLU(),
-            Flatten(),
-            linear(
-                7 * 7 * 64,
-                512),
-            nn.LeakyReLU()
-        )
+        if embeddings:
+            self.feature = embeddings
+        else:
+            self.feature = nn.Sequential(
+                nn.Conv2d(
+                    in_channels=4,
+                    out_channels=32,
+                    kernel_size=8,
+                    stride=4),
+                nn.LeakyReLU(),
+                nn.Conv2d(
+                    in_channels=32,
+                    out_channels=64,
+                    kernel_size=4,
+                    stride=2),
+                nn.LeakyReLU(),
+                nn.Conv2d(
+                    in_channels=64,
+                    out_channels=64,
+                    kernel_size=3,
+                    stride=1),
+                nn.LeakyReLU(),
+                Flatten(),
+                linear(
+                    7 * 7 * 64,
+                    512),
+                nn.LeakyReLU()
+            )
 
         self.actor = nn.Sequential(
             linear(512, 512),

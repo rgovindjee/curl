@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 import torch
 import torch.optim as optim
+import copy
 
 from torch.distributions.categorical import Categorical
 
@@ -145,3 +146,17 @@ class ICMAgent(object):
                 loss.backward()
                 # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
                 self.optimizer.step()
+
+    def start_finetune(self):
+        """
+        Set up extrinsic reward actor-critic network for finetuning on
+        extrinsic rewards.
+        self.ext_model is an actor-critic network with the embeddings from the ICM model.
+        """
+        # Create new actor critic network with embeddings from ICM
+        # TODO(rgg): check if this is working correctly, freeze weights, nograd??
+        embeddings = copy.deepcopy(self.icm.feature.to('cpu'))
+        # Move embeddings to cpu
+        embeddings = embeddings.to('cpu')
+        self.ext_model = CnnActorCriticNetwork(self.input_size, self.output_size, embeddings=embeddings)
+        self.ext_model = self.ext_model.to(self.device)
