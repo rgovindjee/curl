@@ -1,7 +1,9 @@
 *.pyc
-*/runs/*
+**runs**
 */__pycache__/*
 *.swp
 *.model
 *.icm
+*.sif
+*int_reward*
 singularity*
