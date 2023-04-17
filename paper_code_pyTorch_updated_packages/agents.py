@@ -147,7 +147,7 @@ class ICMAgent(object):
                 # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
                 self.optimizer.step()
 
-    def init_finetune(self):
+    def init_finetune(self, use_icm_embeddings=True):
         """
         Set up extrinsic reward actor-critic network for finetuning on
         extrinsic rewards.
@@ -155,10 +155,13 @@ class ICMAgent(object):
         """
         # Create new actor critic network with embeddings from ICM
         # TODO(rgg): check if this is working correctly, freeze weights, nograd??
-        embeddings = copy.deepcopy(self.icm.feature.to('cpu'))
-        # Move embeddings to cpu
-        embeddings = embeddings.to('cpu')
-        self.ext_model = CnnActorCriticNetwork(self.input_size, self.output_size, embeddings=embeddings)
+        if use_icm_embeddings:
+            embeddings = copy.deepcopy(self.icm.feature.to('cpu'))
+            # Move embeddings to cpu
+            embeddings = embeddings.to('cpu')
+            self.ext_model = CnnActorCriticNetwork(self.input_size, self.output_size, embeddings=embeddings)
+        else:
+            self.ext_model = CnnActorCriticNetwork(self.input_size, self.output_size)
         self.ext_model = self.ext_model.to(self.device)
         # Reset optimizer
         self.optimizer = optim.Adam(list(self.ext_model.parameters()), lr=self.lr)

@@ -253,7 +253,7 @@ def main():
             torch.save(agent.model.state_dict(), model_path)
             torch.save(agent.icm.state_dict(), icm_path)
 
-    agent.init_finetune()
+    agent.init_finetune(use_icm_embeddings=True)
     print(f"Finetune for {finetune_steps} steps")
     # Fine tune agent on dense reward from environment
     # No longer use intrinsic reward and curiosity module
