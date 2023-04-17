@@ -58,11 +58,13 @@ def main():
 
     clip_grad_norm = float(default_config['ClipGradNorm'])
 
+    reward_rms_ft = RunningMeanStd()
     reward_rms = RunningMeanStd()
     obs_rms = RunningMeanStd(shape=(1, 4, 84, 84))
 
     pre_obs_norm_step = int(default_config['ObsNormStep'])
     discounted_reward = RewardForwardFilter(gamma)
+    discounted_ft_reward = RewardForwardFilter(gamma)
     save_frequency = int(default_config['SaveFrequency'])
 
     agent = ICMAgent
@@ -220,6 +222,7 @@ def main():
 
         # normalize intrinsic reward
         total_int_reward /= np.sqrt(reward_rms.var)
+
         writer.add_scalar('data/int_reward_per_epi', np.sum(total_int_reward) / num_worker, sample_episode)
         writer.add_scalar('data/int_reward_per_rollout', np.sum(total_int_reward) / num_worker, global_update)
         # -------------------------------------------------------------------------------------------
@@ -255,8 +258,8 @@ def main():
     # Fine tune agent on dense reward from environment
     # No longer use intrinsic reward and curiosity module
     for j in range(finetune_steps):
-        total_state, total_reward, total_done, total_next_state, total_action, total_values, total_policy = \
-            [], [], [], [], [], [], []
+        total_state, total_reward, total_log_reward, total_done, total_next_state, total_action, total_values, total_policy = \
+            [], [], [], [], [], [], [], []
         global_step += (num_worker * num_step)
         global_update += 1
 
@@ -280,10 +283,12 @@ def main():
             rewards = np.hstack(rewards)
             dones = np.hstack(dones)
             real_dones = np.hstack(real_dones)
+            log_rewards = np.hstack(log_rewards)
 
             total_state.append(states)
             total_next_state.append(next_states)
             total_reward.append(rewards)
+            total_log_reward.append(log_rewards)
             total_done.append(dones)
             total_action.append(actions)
             total_values.append(value)
@@ -315,14 +320,20 @@ def main():
         total_logging_policy = torch.stack(total_policy).view(-1, output_size).cpu().numpy()
 
         # Step 2. normalize extrinsic reward
-        total_reward = np.stack(total_reward).transpose()
-        total_reward_per_env = np.array([discounted_reward.update(reward_per_step) for reward_per_step in
+        total_reward = np.stack(total_log_reward).transpose()  # Note: this is log rewards from here on
+        # print(f"Un-normalized log rewards: {total_reward[1:4, 1:10]}")
+        total_reward_per_env = np.array([discounted_ft_reward.update(reward_per_step) for reward_per_step in
                                          total_reward.T])
+        # print(f"Discounted log rewards: {total_reward[1:4, 1:10]}")
         mean, std, count = np.mean(total_reward_per_env), np.std(total_reward_per_env), len(total_reward_per_env)
-        reward_rms.update_from_moments(mean, std ** 2, count)
-        total_reward = (total_reward - reward_rms.mean) / np.sqrt(reward_rms.var)
-        writer.add_scalar('data/ft_reward_per_epi', np.sum(total_reward) / num_worker, sample_episode)
-        writer.add_scalar('data/ft_reward_per_rollout', np.sum(total_reward) / num_worker, global_update)
+        # print(f"Mean log rewards: {mean}")
+        reward_rms_ft.update_from_moments(mean, std ** 2, count)
+        # print(f"Running mean log rewards: {reward_rms_ft.mean}")
+        total_reward = total_reward / np.sqrt(reward_rms_ft.var)
+        # Print normalized reward for debugging
+        # print(f"Normalized reward: {total_reward[1:4, 1:10]}")
+        writer.add_scalar('data/ft_normalized_reward_per_epi', np.sum(total_reward) / num_worker, sample_episode)
+        writer.add_scalar('data/ft_normalized_reward_per_rollout', np.sum(total_reward) / num_worker, global_update)
 
         # logging Max action probability
         writer.add_scalar('data/ft_max_prob', softmax(total_logging_policy).max(1).mean(), sample_episode)
