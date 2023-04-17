@@ -33,6 +33,7 @@ def main():
     is_load_model = False
     is_render = False
     model_path = 'models/{}.model'.format(env_id)
+    ft_model_path = 'models/{}.ftmodel'.format(env_id)
     icm_path = 'models/{}.icm'.format(env_id)
 
     writer = SummaryWriter()
@@ -62,6 +63,7 @@ def main():
 
     pre_obs_norm_step = int(default_config['ObsNormStep'])
     discounted_reward = RewardForwardFilter(gamma)
+    save_frequency = int(default_config['SaveFrequency'])
 
     agent = ICMAgent
 
@@ -136,8 +138,10 @@ def main():
     next_obs = np.stack(next_obs)
     obs_rms.update(next_obs)
     print('End to initalize...')
-
-    while True:
+    print("Starting curiosity-based exploration...")
+    curiosity_steps = int(default_config['CuriositySteps'])
+    finetune_steps = int(default_config['FinetuneSteps'])
+    for i in range(curiosity_steps):
         total_state, total_reward, total_done, total_next_state, total_action, total_int_reward, total_next_obs, total_values, total_policy = \
             [], [], [], [], [], [], [], [], []
         global_step += (num_worker * num_step)
@@ -241,11 +245,109 @@ def main():
                           adv,
                           total_policy)
 
-        if global_step % (num_worker * num_step * 100) == 0:
+        if global_update % save_frequency == 0:
             print('Now Global Step :{}'.format(global_step))
             torch.save(agent.model.state_dict(), model_path)
             torch.save(agent.icm.state_dict(), icm_path)
 
+    agent.init_finetune()
+    print(f"Finetune for {finetune_steps} steps")
+    # Fine tune agent on dense reward from environment
+    # No longer use intrinsic reward and curiosity module
+    for j in range(finetune_steps):
+        total_state, total_reward, total_done, total_next_state, total_action, total_values, total_policy = \
+            [], [], [], [], [], [], []
+        global_step += (num_worker * num_step)
+        global_update += 1
 
+        # Step 1. n-step rollout
+        for _ in range(num_step):
+            actions, value, policy = agent.get_action((states - obs_rms.mean) / np.sqrt(obs_rms.var))
+
+            for parent_conn, action in zip(parent_conns, actions):
+                parent_conn.send(action)
+
+            next_states, rewards, dones, real_dones, log_rewards, next_obs = [], [], [], [], [], []
+            for parent_conn in parent_conns:
+                s, r, d, rd, lr = parent_conn.recv()
+                next_states.append(s)
+                rewards.append(r)
+                dones.append(d)
+                real_dones.append(rd)
+                log_rewards.append(lr)
+
+            next_states = np.stack(next_states)
+            rewards = np.hstack(rewards)
+            dones = np.hstack(dones)
+            real_dones = np.hstack(real_dones)
+
+            total_state.append(states)
+            total_next_state.append(next_states)
+            total_reward.append(rewards)
+            total_done.append(dones)
+            total_action.append(actions)
+            total_values.append(value)
+            total_policy.append(policy)
+
+            states = next_states[:, :, :, :]
+
+            sample_rall += log_rewards[sample_env_idx]
+
+            sample_step += 1
+            if real_dones[sample_env_idx]:
+                sample_episode += 1
+                writer.add_scalar('data/ft_reward_per_epi', sample_rall, sample_episode)
+                writer.add_scalar('data/ft_reward_per_rollout', sample_rall, global_update)
+                writer.add_scalar('data/ft_step', sample_step, sample_episode)
+                sample_rall = 0
+                sample_step = 0
+
+        # calculate last next value
+        _, value, _ = agent.get_action((states - obs_rms.mean) / np.sqrt(obs_rms.var))
+        total_values.append(value)
+        # --------------------------------------------------
+
+        total_state = np.stack(total_state).transpose([1, 0, 2, 3, 4]).reshape([-1, 4, 84, 84])
+        total_next_state = np.stack(total_next_state).transpose([1, 0, 2, 3, 4]).reshape([-1, 4, 84, 84])
+        total_action = np.stack(total_action).transpose().reshape([-1])
+        total_done = np.stack(total_done).transpose()
+        total_values = np.stack(total_values).transpose()
+        total_logging_policy = torch.stack(total_policy).view(-1, output_size).cpu().numpy()
+
+        # Step 2. normalize extrinsic reward
+        total_reward = np.stack(total_reward).transpose()
+        total_reward_per_env = np.array([discounted_reward.update(reward_per_step) for reward_per_step in
+                                         total_reward.T])
+        mean, std, count = np.mean(total_reward_per_env), np.std(total_reward_per_env), len(total_reward_per_env)
+        reward_rms.update_from_moments(mean, std ** 2, count)
+        total_reward = (total_reward - reward_rms.mean) / np.sqrt(reward_rms.var)
+        writer.add_scalar('data/ft_reward_per_epi', np.sum(total_reward) / num_worker, sample_episode)
+        writer.add_scalar('data/ft_reward_per_rollout', np.sum(total_reward) / num_worker, global_update)
+
+        # logging Max action probability
+        writer.add_scalar('data/ft_max_prob', softmax(total_logging_policy).max(1).mean(), sample_episode)
+
+        # Step 3. make target and advantage
+        # Advantage based on dense reward
+        target, adv = make_train_data(total_reward,
+                                      np.zeros_like(total_reward),
+                                      total_values,
+                                      gamma,
+                                      num_step,
+                                      num_worker)
+
+        adv = (adv - np.mean(adv)) / (np.std(adv) + 1e-8)
+
+        # Train agent on dense reward
+        agent.train_finetune((total_state - obs_rms.mean) / np.sqrt(obs_rms.var),
+                            (total_next_state - obs_rms.mean) / np.sqrt(obs_rms.var),
+                            target, total_action,
+                            adv,
+                            total_policy)
+        
+        if global_update % save_frequency == 0:
+            print('Now Finetune Global Step :{}'.format(global_step))
+            torch.save(agent.ext_model.state_dict(), ft_model_path)
+        
 if __name__ == '__main__':
     main()

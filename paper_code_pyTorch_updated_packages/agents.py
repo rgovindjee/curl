@@ -44,11 +44,11 @@ class ICMAgent(object):
         self.eta = eta
         self.ppo_eps = ppo_eps
         self.clip_grad_norm = clip_grad_norm
+        self.lr = learning_rate
         self.device = torch.device('cuda' if use_cuda else 'cpu')
-
         self.icm = ICMModel(input_size, output_size, use_cuda)
         self.optimizer = optim.Adam(list(self.model.parameters()) + list(self.icm.parameters()),
-                                    lr=learning_rate)
+                                    lr=self.lr)
         self.icm = self.icm.to(self.device)
 
         self.model = self.model.to(self.device)
@@ -147,7 +147,7 @@ class ICMAgent(object):
                 # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
                 self.optimizer.step()
 
-    def start_finetune(self):
+    def init_finetune(self):
         """
         Set up extrinsic reward actor-critic network for finetuning on
         extrinsic rewards.
@@ -160,3 +160,54 @@ class ICMAgent(object):
         embeddings = embeddings.to('cpu')
         self.ext_model = CnnActorCriticNetwork(self.input_size, self.output_size, embeddings=embeddings)
         self.ext_model = self.ext_model.to(self.device)
+        # Reset optimizer
+        self.optimizer = optim.Adam(list(self.ext_model.parameters()), lr=self.lr)
+
+    def train_finetune(self, s_batch, next_s_batch, target_batch, y_batch, adv_batch, old_policy):
+        """
+        Train the extrinsic reward actor-critic network on extrinsic rewards.
+        """
+        s_batch = torch.FloatTensor(s_batch).to(self.device)
+        next_s_batch = torch.FloatTensor(next_s_batch).to(self.device)
+        target_batch = torch.FloatTensor(target_batch).to(self.device)
+        y_batch = torch.LongTensor(y_batch).to(self.device)
+        adv_batch = torch.FloatTensor(adv_batch).to(self.device)
+
+        sample_range = np.arange(len(s_batch))
+        
+        with torch.no_grad():
+            policy_old_list = torch.stack(old_policy).permute(1, 0, 2).contiguous().view(-1, self.output_size).to(
+                self.device)
+
+            m_old = Categorical(F.softmax(policy_old_list, dim=-1))
+            log_prob_old = m_old.log_prob(y_batch)
+            # ------------------------------------------------------------
+        
+        for i in range(self.epoch):
+            np.random.shuffle(sample_range)
+            for j in range(int(len(s_batch) / self.batch_size)):
+                sample_idx = sample_range[self.batch_size * j:self.batch_size * (j + 1)]
+
+                policy, value = self.ext_model(s_batch[sample_idx])
+                m = Categorical(F.softmax(policy, dim=-1))
+                log_prob = m.log_prob(y_batch[sample_idx])
+
+                ratio = torch.exp(log_prob - log_prob_old[sample_idx])
+
+                surr1 = ratio * adv_batch[sample_idx]
+                surr2 = torch.clamp(
+                    ratio,
+                    1.0 - self.ppo_eps,
+                    1.0 + self.ppo_eps) * adv_batch[sample_idx]
+
+                actor_loss = -torch.min(surr1, surr2).mean()
+                critic_loss = F.mse_loss(
+                    value.sum(1), target_batch[sample_idx])
+
+                entropy = m.entropy().mean()
+
+                self.optimizer.zero_grad()
+                loss = actor_loss + 0.5 * critic_loss - 0.001 * entropy
+                loss.backward()
+                # torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
+                self.optimizer.step()
