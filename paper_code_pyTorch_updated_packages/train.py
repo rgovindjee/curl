@@ -98,8 +98,10 @@ def main():
     if is_load_model:
         if use_cuda:
             agent.model.load_state_dict(torch.load(model_path))
+            agent.icm.load_state_dict(torch.load(icm_path))
         else:
             agent.model.load_state_dict(torch.load(model_path, map_location='cpu'))
+            agent.icm.load_state_dict(torch.load(icm_path, map_location='cpu'))
 
     works = []
     parent_conns = []
