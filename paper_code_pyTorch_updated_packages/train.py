@@ -255,6 +255,14 @@ def main():
             torch.save(agent.model.state_dict(), model_path)
             torch.save(agent.icm.state_dict(), icm_path)
 
+    sample_episode = 0
+    sample_rall = 0
+    sample_step = 0
+    sample_env_idx = 0
+    sample_i_rall = 0
+    global_update = 0
+    global_step = 0
+
     agent.init_finetune(use_icm_embeddings=True)
     print(f"Finetune for {finetune_steps} steps")
     # Fine tune agent on dense reward from environment
