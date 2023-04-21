@@ -9,8 +9,8 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 
 # Save a checkpoint every set number of steps
 n_envs = 32  # Number of environments to run in parallel.
-save_freq = 2000  # in env.step() calls. This takes a long time, so we'll do it less often.
-total_steps = 10000  # in env.step() calls.
+save_freq = 200_000  # in env.step() calls. This takes a long time, so we'll do it less often.
+total_steps = 100_000_000  # in env.step() calls.
 n_stack = 4  # Number of frames to stack.
 src_dir = "/root/src"
 use_cuda = True
