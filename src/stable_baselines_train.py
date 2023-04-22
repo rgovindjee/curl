@@ -6,15 +6,17 @@ from stable_baselines3.common.vec_env import VecFrameStack
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3.common.env_util import make_atari_env
 from stable_baselines3.common.callbacks import CheckpointCallback
+from icm_frame_stack import IcmFrameStack
 
 # Save a checkpoint every set number of steps
-n_envs = 16  # Number of environments to run in parallel.
+n_envs = 6  # Number of environments to run in parallel.
 save_freq = 200_000  # in env.step() calls. This takes a long time, so we'll do it less often.
-total_steps = 100_000_000  # in env.step() calls.
+total_steps = 5_000  # in env.step() calls.
 n_stack = 4  # Number of frames to stack.
-src_dir = "/home/rajivg/curl/src"
-use_cuda = True
+src_dir = "/root/src"
+use_cuda = False
 use_multiprocessing = True
+use_icm = True
 
 if __name__ == "__main__":
     a2cPath = os.path.join(src_dir, 'models')
@@ -31,16 +33,16 @@ if __name__ == "__main__":
 
     device_str = "cuda" if use_cuda else "cpu"
     env_cls = SubprocVecEnv if use_multiprocessing else None
+    env_wrapper = IcmFrameStack if use_icm else VecFrameStack
 
-    print(playGround.action_space)
-    print(playGround.observation_space)
+    # print(playGround.action_space)
+    # print(playGround.observation_space)
 
-    playGround = make_atari_env('Breakout-v4', n_envs=n_envs, vec_env_cls=SubprocVecEnv, seed=0)
-    playGround = VecFrameStack(playGround, n_stack=n_stack)
+    playGround = make_atari_env('Breakout-v4', n_envs=n_envs, vec_env_cls=env_cls, seed=0)
+    playGround = env_wrapper(playGround, n_stack=n_stack)
 
     logPath = os.path.join(src_dir, 'runs')
 
     laModel = A2C('CnnPolicy', playGround ,verbose=1, tensorboard_log=logPath, device=device_str)
 
     laModel.learn(total_timesteps=total_steps, callback=checkpoint_callback)
-    
