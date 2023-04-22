@@ -73,6 +73,8 @@ class IcmFrameStack(VecFrameStack):
         # print(f"forward loss: {forward_loss}")
         # print(f"inverse loss: {inverse_loss}")
 
+        # TODO(rgg): log to tensorboard
+
         self.optimizer.zero_grad()
         # Note this is different from the Pathak paper where they use a weighted sum 
         # including the actor-critic loss.
@@ -82,6 +84,7 @@ class IcmFrameStack(VecFrameStack):
 
         # Record previous state for use in next step
         self.state = observations
+        # TODO(rgg): return intrinsic reward instead of extrinsic reward
         return observations, rewards, dones, infos
 
 class ICMModel(nn.Module):
