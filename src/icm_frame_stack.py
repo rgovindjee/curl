@@ -87,6 +87,7 @@ class IcmFrameStack(VecFrameStack):
 class ICMModel(nn.Module):
     """
     PyTorch implementation of the Intrinsic Curiosity Module (ICM) from Pathak et al. (2017).
+    Based on code implementation in jwcleo/curiosity-driven-exploration-pytorch
     """
     def __init__(self, input_size=0, output_size=0, use_cuda=True):
         """
@@ -213,4 +214,3 @@ class ICMModel(nn.Module):
 class Flatten(nn.Module):
     def forward(self, input):
         return input.view(input.size(0), -1)
-        # return input.flatten()
