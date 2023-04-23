@@ -21,7 +21,8 @@ class IcmFrameStack(VecFrameStack):
                  n_stack: int,
                  channels_order = None,
                  learning_rate=5e-5,
-                 log_path= "./") -> None:
+                 log_path= "./",
+                 eta = 0.001) -> None:
         super().__init__(venv, n_stack, channels_order)
         # Initialize the ICM module.
         self.lr = learning_rate
@@ -36,6 +37,7 @@ class IcmFrameStack(VecFrameStack):
         self.num_timesteps = 0
         self.iterations = 0
         self.logger = configure_logger(verbose=1, tensorboard_log=log_path, tb_log_name="ICM")
+        self.eta = eta # Intrinsic reward coefficient
 
     def step_async(self, actions: np.ndarray) -> None:
         # actions is a numpy array with one action per env for SubprocVecEnvs
@@ -64,21 +66,18 @@ class IcmFrameStack(VecFrameStack):
         icm_inputs = (self.state, next_state, self.action) 
         # Will return N x ... tensors where N=n_envs
         real_next_state_feature, pred_next_state_feature, pred_action = self.icm(icm_inputs)
-        # Perform gradient descent on the ICM's parameters
-        # Replace rewards with intrinsic rewards so training maximizes intrinsic reward
+        intrinsic_reward = self.eta * F.mse_loss(real_next_state_feature, pred_next_state_feature, reduction='none').mean(-1)
+
+        # Caclulate the forward and inverse model losses
         ce = nn.CrossEntropyLoss()
         forward_mse = nn.MSELoss()
         y_action = self.icm.actions_to_tensor(self.action)  # Use this to train the inverse model
         inverse_loss = ce(
             pred_action, y_action.detach())
-
         forward_loss = forward_mse(
             pred_next_state_feature, real_next_state_feature.detach())
         
-        # print(f"forward loss: {forward_loss}")
-        # print(f"inverse loss: {inverse_loss}")
-
-
+        # Perform gradient descent on the ICM's parameters
         self.optimizer.zero_grad()
         # Note this is different from the Pathak paper where they use a weighted sum 
         # including the actor-critic loss.
@@ -88,16 +87,22 @@ class IcmFrameStack(VecFrameStack):
 
         # Record previous state for use in next step
         self.state = observations
-        # TODO(rgg): return intrinsic reward instead of extrinsic reward
 
         # Log to tensorboard every so many steps
-        # The A2C logger logs every 100 iterations = n_envs * 5 timesteps/rollout
+        # The A2C logger logs every 100 iterations: 100* n_envs * 5 timesteps/rollout
         if self.iterations % 60 == 0:
             self.logger.record("train/forward_loss_icm", np.mean(self.to_numpy(forward_loss)))
             self.logger.record("train/inverse_loss_icm", np.mean(self.to_numpy(inverse_loss)))
+            self.logger.record("train/curiosity_reward", np.mean(self.to_numpy(intrinsic_reward)))
+            self.logger.record("train/mean_ext_reward_per_step", np.mean(rewards))
             self.logger.dump(self.num_timesteps)
+
+        # Increment counters for logging
         self.iterations += 1
         self.num_timesteps += self.n_envs
+
+        # Replace rewards with intrinsic rewards so training maximizes intrinsic reward
+        rewards = self.to_numpy(intrinsic_reward)
         return observations, rewards, dones, infos
     
     def to_numpy(self, tensor):
