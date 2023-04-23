@@ -10,8 +10,8 @@ from icm_frame_stack import IcmFrameStack
 
 # Save a checkpoint every set number of steps
 n_envs = 6  # Number of environments to run in parallel.
-save_freq = 200_000  # in env.step() calls. This takes a long time, so we'll do it less often.
-total_steps = 5_000  # in env.step() calls.
+save_freq = 10_000  # in env.step() calls. This takes a long time, so we'll do it less often.
+total_steps = 20_500  # in env.step() calls.
 n_stack = 4  # Number of frames to stack.
 src_dir = "/root/src"
 use_cuda = False
@@ -19,6 +19,7 @@ use_multiprocessing = True
 use_icm = True
 
 if __name__ == "__main__":
+    logPath = os.path.join(src_dir, 'runs')
     a2cPath = os.path.join(src_dir, 'models')
 
     checkpoint_callback = CheckpointCallback(
@@ -39,10 +40,9 @@ if __name__ == "__main__":
     # print(playGround.observation_space)
 
     playGround = make_atari_env('Breakout-v4', n_envs=n_envs, vec_env_cls=env_cls, seed=0)
-    playGround = env_wrapper(playGround, n_stack=n_stack)
+    playGround = env_wrapper(playGround, n_stack=n_stack, log_path=logPath)
 
-    logPath = os.path.join(src_dir, 'runs')
 
-    laModel = A2C('CnnPolicy', playGround ,verbose=1, tensorboard_log=logPath, device=device_str)
-
+    laModel = A2C('CnnPolicy', playGround, verbose=1, tensorboard_log=logPath, device=device_str)
+  
     laModel.learn(total_timesteps=total_steps, callback=checkpoint_callback)

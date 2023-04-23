@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 from stable_baselines3.common.vec_env import VecFrameStack
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv, VecEnvWrapper
+from stable_baselines3.common.utils import configure_logger
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn as nn
@@ -19,7 +20,8 @@ class IcmFrameStack(VecFrameStack):
                  venv: VecEnv,
                  n_stack: int,
                  channels_order = None,
-                 learning_rate=1e-4) -> None:
+                 learning_rate=5e-5,
+                 log_path= "./") -> None:
         super().__init__(venv, n_stack, channels_order)
         # Initialize the ICM module.
         self.lr = learning_rate
@@ -31,6 +33,9 @@ class IcmFrameStack(VecFrameStack):
         self.state = None  # Save previous state for use in ICM module
         self.optimizer = optim.Adam(list(self.icm.parameters()),
                                     lr=self.lr)
+        self.num_timesteps = 0
+        self.iterations = 0
+        self.logger = configure_logger(verbose=1, tensorboard_log=log_path, tb_log_name="ICM")
 
     def step_async(self, actions: np.ndarray) -> None:
         # actions is a numpy array with one action per env for SubprocVecEnvs
@@ -73,7 +78,6 @@ class IcmFrameStack(VecFrameStack):
         # print(f"forward loss: {forward_loss}")
         # print(f"inverse loss: {inverse_loss}")
 
-        # TODO(rgg): log to tensorboard
 
         self.optimizer.zero_grad()
         # Note this is different from the Pathak paper where they use a weighted sum 
@@ -85,7 +89,19 @@ class IcmFrameStack(VecFrameStack):
         # Record previous state for use in next step
         self.state = observations
         # TODO(rgg): return intrinsic reward instead of extrinsic reward
+
+        # Log to tensorboard every so many steps
+        # The A2C logger logs every 100 iterations = n_envs * 5 timesteps/rollout
+        if self.iterations % 60 == 0:
+            self.logger.record("train/forward_loss_icm", np.mean(self.to_numpy(forward_loss)))
+            self.logger.record("train/inverse_loss_icm", np.mean(self.to_numpy(inverse_loss)))
+            self.logger.dump(self.num_timesteps)
+        self.iterations += 1
+        self.num_timesteps += self.n_envs
         return observations, rewards, dones, infos
+    
+    def to_numpy(self, tensor):
+        return tensor.detach().cpu().numpy()
 
 class ICMModel(nn.Module):
     """
