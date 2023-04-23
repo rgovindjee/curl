@@ -40,7 +40,7 @@ if __name__ == "__main__":
     # print(playGround.observation_space)
 
     playGround = make_atari_env('Breakout-v4', n_envs=n_envs, vec_env_cls=env_cls, seed=0)
-    playGround = env_wrapper(playGround, n_stack=n_stack, log_path=logPath)
+    playGround = env_wrapper(playGround, n_stack=n_stack, log_path=logPath, device=device_str)
 
 
     laModel = A2C('CnnPolicy', playGround, verbose=1, tensorboard_log=logPath, device=device_str)

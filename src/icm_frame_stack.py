@@ -22,7 +22,8 @@ class IcmFrameStack(VecFrameStack):
                  channels_order = None,
                  learning_rate=5e-5,
                  log_path= "./",
-                 eta = 0.001) -> None:
+                 eta = 0.001,
+                 device="cpu") -> None:
         super().__init__(venv, n_stack, channels_order)
         # Initialize the ICM module.
         self.lr = learning_rate
@@ -30,7 +31,7 @@ class IcmFrameStack(VecFrameStack):
         self.n_envs = venv.num_envs
         print(f"IcmFrameStack action space: {venv.action_space.shape}")
         self.n_actions = 4
-        self.icm = ICMModel(output_size=self.n_actions, use_cuda=False)
+        self.icm = ICMModel(output_size=self.n_actions, device=device)
         self.state = None  # Save previous state for use in ICM module
         self.optimizer = optim.Adam(list(self.icm.parameters()),
                                     lr=self.lr)
@@ -113,7 +114,7 @@ class ICMModel(nn.Module):
     PyTorch implementation of the Intrinsic Curiosity Module (ICM) from Pathak et al. (2017).
     Based on code implementation in jwcleo/curiosity-driven-exploration-pytorch
     """
-    def __init__(self, input_size=0, output_size=0, use_cuda=True):
+    def __init__(self, input_size=0, output_size=0, device="cpu"):
         """
         Args:
             input_size (int): dimensions of observation space. NOT USED
@@ -123,7 +124,7 @@ class ICMModel(nn.Module):
 
         self.input_size = input_size
         self.output_size = output_size
-        self.device = torch.device('cuda' if use_cuda else 'cpu')
+        self.device = torch.device(device)
 
         feature_output = 7 * 7 * 64
         self.feature = nn.Sequential(
@@ -147,13 +148,13 @@ class ICMModel(nn.Module):
             nn.LeakyReLU(),
             Flatten(),
             nn.Linear(feature_output, 512)
-        )
+        ).to(self.device)
 
         self.inverse_net = nn.Sequential(
             nn.Linear(512 * 2, 512),
             nn.ReLU(),
             nn.Linear(512, output_size)
-        )
+        ).to(self.device)
 
         self.residual = [nn.Sequential(
             nn.Linear(output_size + 512, 512),
@@ -164,10 +165,10 @@ class ICMModel(nn.Module):
         self.forward_net_1 = nn.Sequential(
             nn.Linear(output_size + 512, 512),
             nn.LeakyReLU()
-        )
+        ).to(self.device)
         self.forward_net_2 = nn.Sequential(
             nn.Linear(output_size + 512, 512),
-        )
+        ).to(self.device)
 
         for p in self.modules():
             if isinstance(p, nn.Conv2d):
@@ -186,7 +187,7 @@ class ICMModel(nn.Module):
         tensors = [torch.FloatTensor(arr.transpose(2, 0, 1)) for arr in obs]
         t_unsqueezed = [torch.unsqueeze(t, dim=0) for t in tensors] # Add extra dimension for batch size
         t_cat = torch.cat(t_unsqueezed, dim=0)
-        return t_cat
+        return t_cat.to(self.device)
 
     def actions_to_tensor(self, actions):
         """
@@ -202,7 +203,7 @@ class ICMModel(nn.Module):
         t_onehot = torch.FloatTensor(actions.shape[0], self.output_size)
         t_onehot.zero_()
         t_onehot.scatter_(1, t.unsqueeze(1), 1)
-        return t_onehot
+        return t_onehot.to(self.device)
 
     def forward(self, inputs):
         state, next_state, action = inputs
