@@ -24,7 +24,9 @@ class IcmFrameStack(VecFrameStack):
                  learning_rate=5e-5,
                  log_path= "./",
                  eta = 0.01,
-                 device="cpu") -> None:
+                 device="cpu",
+                 savingFreq=100,
+                 model_path="/home/tpriya/simplePython/curl-stable-baselines/src/models") -> None:
         super().__init__(venv, n_stack, channels_order)
         # Initialize the ICM module.
         self.lr = learning_rate
@@ -40,6 +42,9 @@ class IcmFrameStack(VecFrameStack):
         self.iterations = 0
         self.logger = configure_logger(verbose=1, tensorboard_log=log_path, tb_log_name="ICM")
         self.eta = eta # Intrinsic reward coefficient
+        self.lastSaved = 0
+        self.savingFreq = savingFreq
+        self.model_path=model_path
 
     def step_async(self, actions: np.ndarray) -> None:
         # actions is a numpy array with one action per env for SubprocVecEnvs
@@ -98,6 +103,10 @@ class IcmFrameStack(VecFrameStack):
             self.logger.record("train/curiosity_reward", np.mean(self.to_numpy(intrinsic_reward)))
             self.logger.record("train/mean_ext_reward_per_step", np.mean(rewards))
             self.logger.dump(self.num_timesteps)
+        if (self.num_timesteps - self.lastSaved) > self.savingFreq:
+            model_path = os.path.join(self.model_path,"icm_"+self.num_timesteps.__str__()+".model")
+            torch.save(self.icm.feature.state_dict(), model_path)
+            self.lastSaved = self.num_timesteps
 
         # Increment counters for logging
         self.iterations += 1
