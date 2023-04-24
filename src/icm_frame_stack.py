@@ -105,6 +105,10 @@ class IcmFrameStack(VecFrameStack):
         # Record previous state for use in next step
         self.state = observations
 
+        # Increment counters for logging
+        self.iterations += 1
+        self.num_timesteps += self.n_envs
+
         # Log to tensorboard every so many steps
         # The A2C logger logs every 100 iterations: 100* n_envs * 5 timesteps/rollout
         if self.iterations % 60 == 0:
@@ -117,15 +121,11 @@ class IcmFrameStack(VecFrameStack):
             self.logger.record(
                 "train/mean_ext_reward_per_step", np.mean(rewards))
             self.logger.dump(self.num_timesteps)
-        if (self.num_timesteps - self.lastSaved) > self.saving_freq:
+        if (self.num_timesteps - self.lastSaved) >= self.saving_freq:
             model_path = os.path.join(
                 self.model_path, "icm_" + self.num_timesteps.__str__() + ".model")
             torch.save(self.icm.feature.state_dict(), model_path)
             self.lastSaved = self.num_timesteps
-
-        # Increment counters for logging
-        self.iterations += 1
-        self.num_timesteps += self.n_envs
 
         # Replace rewards with intrinsic rewards so training maximizes intrinsic reward
         rewards = self.to_numpy(intrinsic_reward)
