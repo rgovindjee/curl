@@ -11,6 +11,8 @@ from stable_baselines3.common.type_aliases import Schedule
 To use: pass the ActorCriticIcmPolicy class to the A2C constructor, along with policy kwargs
 containing the feature kwarg for the ICM embeddings.
 """
+
+
 class IcmCnn(BaseFeaturesExtractor):
     """
     CNN from DQN Nature paper:
@@ -34,7 +36,7 @@ class IcmCnn(BaseFeaturesExtractor):
         observation_space: spaces.Box,
         features_dim: int = 512,
         normalized_image: bool = False,
-        icm_embeddings = None,
+        icm_embeddings=None,
     ) -> None:
         super().__init__(observation_space, features_dim)
         # We assume CxHxW images (channels first)
@@ -55,7 +57,8 @@ class IcmCnn(BaseFeaturesExtractor):
             self.model = icm_embeddings
         else:
             self.cnn = nn.Sequential(
-                nn.Conv2d(n_input_channels, 32, kernel_size=8, stride=4, padding=0),
+                nn.Conv2d(n_input_channels, 32,
+                          kernel_size=8, stride=4, padding=0),
                 nn.ReLU(),
                 nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=0),
                 nn.ReLU(),
@@ -66,13 +69,16 @@ class IcmCnn(BaseFeaturesExtractor):
 
             # Compute shape by doing one forward pass
             with th.no_grad():
-                n_flatten = self.cnn(th.as_tensor(observation_space.sample()[None]).float()).shape[1]
+                n_flatten = self.cnn(th.as_tensor(
+                    observation_space.sample()[None]).float()).shape[1]
 
-            self.linear = nn.Sequential(nn.Linear(n_flatten, features_dim), nn.ReLU())
+            self.linear = nn.Sequential(
+                nn.Linear(n_flatten, features_dim), nn.ReLU())
             self.model = nn.Sequential(self.cnn, self.linear)
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         return self.model(observations)
+
 
 class ActorCriticIcmCnnPolicy(ActorCriticPolicy):
     """
