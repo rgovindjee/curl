@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 from stable_baselines3.common.vec_env import VecFrameStack
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv, VecEnvWrapper
 from stable_baselines3.common.utils import configure_logger
+from stable_baselines3.common.preprocessing import preprocess_obs
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn as nn
@@ -22,7 +23,7 @@ class IcmFrameStack(VecFrameStack):
                  channels_order = None,
                  learning_rate=5e-5,
                  log_path= "./",
-                 eta = 0.001,
+                 eta = 0.01,
                  device="cpu") -> None:
         super().__init__(venv, n_stack, channels_order)
         # Initialize the ICM module.
@@ -31,7 +32,7 @@ class IcmFrameStack(VecFrameStack):
         self.n_envs = venv.num_envs
         print(f"IcmFrameStack action space: {venv.action_space.shape}")
         self.n_actions = 4
-        self.icm = ICMModel(output_size=self.n_actions, device=device)
+        self.icm = ICMModel(output_size=self.n_actions, device=device, obs_space=venv.observation_space)
         self.state = None  # Save previous state for use in ICM module
         self.optimizer = optim.Adam(list(self.icm.parameters()),
                                     lr=self.lr)
@@ -114,7 +115,7 @@ class ICMModel(nn.Module):
     PyTorch implementation of the Intrinsic Curiosity Module (ICM) from Pathak et al. (2017).
     Based on code implementation in jwcleo/curiosity-driven-exploration-pytorch
     """
-    def __init__(self, input_size=0, output_size=0, device="cpu"):
+    def __init__(self, input_size=0, output_size=0, device="cpu", obs_space=None):
         """
         Args:
             input_size (int): dimensions of observation space. NOT USED
@@ -125,6 +126,7 @@ class ICMModel(nn.Module):
         self.input_size = input_size
         self.output_size = output_size
         self.device = torch.device(device)
+        self.obs_space = obs_space
 
         feature_output = 7 * 7 * 64
         self.feature = nn.Sequential(
@@ -208,8 +210,8 @@ class ICMModel(nn.Module):
     def forward(self, inputs):
         state, next_state, action = inputs
         # Convert input to tensor
-        state = self.observations_to_tensor(state)
-        next_state = self.observations_to_tensor(next_state)
+        state = preprocess_obs(self.observations_to_tensor(state), self.obs_space)
+        next_state = preprocess_obs(self.observations_to_tensor(next_state), self.obs_space)
         action = self.actions_to_tensor(action) 
 
         encode_state = self.feature(state)
