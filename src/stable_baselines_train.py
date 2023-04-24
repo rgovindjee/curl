@@ -62,7 +62,7 @@ if __name__ == "__main__":
     playGround = make_atari_env(
         'Breakout-v4', n_envs=n_envs, vec_env_cls=env_cls, seed=0)
     playGround = env_wrapper(playGround, n_stack=n_stack, log_path=log_dir,
-                             device=device_str, saving_freq=100, model_path=model_dir)
+                             device=device_str, saving_freq=save_freq, model_path=model_dir)
 
     print(playGround.observation_space.shape)
 
