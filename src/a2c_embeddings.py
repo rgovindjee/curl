@@ -3,6 +3,8 @@ import torch as th
 from gym import spaces
 from stable_baselines3.common.preprocessing import is_image_space
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
+from torchsummary import summary
+import copy
 
 """
 To use: pass the ActorCriticIcmPolicy class to the A2C constructor, along with policy kwargs
@@ -51,7 +53,7 @@ class IcmCnn(BaseFeaturesExtractor):
         )
         n_input_channels = observation_space.shape[0]
         if icm_embeddings is not None:
-            self.model = icm_embeddings
+            self.model = copy.deepcopy(icm_embeddings)
         else:
             print(f"Constructing ICM CNN with {n_input_channels} input channels")
             self.cnn = nn.Sequential(
@@ -73,6 +75,7 @@ class IcmCnn(BaseFeaturesExtractor):
             self.linear = nn.Sequential(
                 nn.Linear(n_flatten, features_dim), nn.ReLU())
             self.model = nn.Sequential(self.cnn, self.linear)
+        summary(self.model, (n_input_channels, 84, 84))  # (batch_size, channels, height, width)
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         return self.model(observations)
