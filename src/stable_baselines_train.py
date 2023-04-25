@@ -22,7 +22,6 @@ log_dir = os.path.join(src_dir, 'runs')
 model_dir = os.path.join(src_dir, 'models')
 use_cuda = True
 use_multiprocessing = True
-use_icm = True
 # Leave as None to train A2C feature extractor from scratch.
 # Otherwise, provide a path to a pretrained feature extractor (e.g. from ICM).
 embeddings_load_path = os.path.join(model_dir, "icm_102.model")
@@ -56,7 +55,6 @@ if __name__ == "__main__":
 
     device_str = "cuda" if use_cuda else "cpu"
     env_cls = SubprocVecEnv if use_multiprocessing else None
-    env_wrapper = IcmFrameStack if use_icm else VecFrameStack
 
     # print(training_env.action_space)
     training_env = make_atari_env(
@@ -64,7 +62,7 @@ if __name__ == "__main__":
     if rewards == "extrinsic":
         training_env = VecFrameStack(training_env, n_stack=n_stack)
     elif rewards == "intrinsic":
-        training_env = env_wrapper(training_env, n_stack=n_stack, log_path=log_dir,
+        training_env = IcmFrameStack(training_env, n_stack=n_stack, log_path=log_dir,
                                 device=device_str, saving_freq=save_freq, model_path=model_dir,
                                 learning_rate=5e-6)
     elif rewards == "both":
