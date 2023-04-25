@@ -12,20 +12,20 @@ from icm_frame_stack import IcmFrameStack
 from a2c_embeddings import IcmCnn
 
 # Save a checkpoint every set number of steps
-n_envs = 6  # Number of environments to run in parallel.
+n_envs = 16  # Number of environments to run in parallel.
 # in env.step() calls. This takes a long time, so we'll do it less often.
-save_freq = 10_000
-total_steps = 150  # in env.step() calls.
+save_freq = 500_000
+total_steps = 100_000_000  # in env.step() calls.
 n_stack = 4  # Number of frames to stack.
 src_dir = "/root/src"
 log_dir = os.path.join(src_dir, 'runs')
 model_dir = os.path.join(src_dir, 'models')
-use_cuda = False
+use_cuda = True
 use_multiprocessing = True
 use_icm = True
 # Leave as None to train A2C feature extractor from scratch.
 # Otherwise, provide a path to a pretrained feature extractor (e.g. from ICM).
-embeddings_load_path = os.path.join(model_dir, "icm_102.model")  
+embeddings_load_path = None #os.path.join(model_dir, "icm_102.model")  
 
 def create_embeddings_module(n_input_channels=4):
     feature_output = 7 * 7 * 64
@@ -62,7 +62,8 @@ if __name__ == "__main__":
     playGround = make_atari_env(
         'Breakout-v4', n_envs=n_envs, vec_env_cls=env_cls, seed=0)
     playGround = env_wrapper(playGround, n_stack=n_stack, log_path=log_dir,
-                             device=device_str, saving_freq=save_freq, model_path=model_dir)
+                             device=device_str, saving_freq=save_freq, model_path=model_dir,
+                             learning_rate=1e-6)
 
     print(playGround.observation_space.shape)
 
