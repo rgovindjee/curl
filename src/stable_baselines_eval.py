@@ -11,6 +11,7 @@ model_name = "rl_model_8000_steps.zip"
 model_path = os.path.join(model_folder, model_name)
 n_envs = 1 # Not currently running in parallel.
 n_stack = 4  # Number of frames to stack.
+episodes = 10  # Number of "lives" to play
 
 singlePlayGround = make_atari_env('Breakout-v4', n_envs=n_envs, seed=0, env_kwargs={'render_mode':'human'})
 singlePlayGround = VecFrameStack(singlePlayGround, n_stack=n_stack)
@@ -22,7 +23,6 @@ kwargs = {"features_extractor_kwargs": {"icm_embeddings": icm},
 trained_model = A2C('CnnPolicy', singlePlayGround, policy_kwargs=kwargs, verbose=1)
 trained_model.set_parameters(load_path_or_dict=model_path)
 
-episodes = 10
 for episode in range(1, episodes+1):
     done = False
     obs = singlePlayGround.reset()

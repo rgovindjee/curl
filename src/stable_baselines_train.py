@@ -25,7 +25,8 @@ use_multiprocessing = True
 use_icm = True
 # Leave as None to train A2C feature extractor from scratch.
 # Otherwise, provide a path to a pretrained feature extractor (e.g. from ICM).
-embeddings_load_path = None #os.path.join(model_dir, "icm_102.model")  
+embeddings_load_path = os.path.join(model_dir, "icm_102.model")
+rewards = "extrinsic"  # "extrinsic" or "intrinsic" (curiosity) or "both" (straight sum)
 
 def create_embeddings_module(n_input_channels=4):
     feature_output = 7 * 7 * 64
@@ -50,33 +51,40 @@ if __name__ == "__main__":
     )
 
     environment = 'Breakout-v4'
-    playGround = gym.make(environment)
-    playGround.reset()
+    training_env = gym.make(environment)
+    training_env.reset()
 
     device_str = "cuda" if use_cuda else "cpu"
     env_cls = SubprocVecEnv if use_multiprocessing else None
     env_wrapper = IcmFrameStack if use_icm else VecFrameStack
 
-    # print(playGround.action_space)
-
-    playGround = make_atari_env(
+    # print(training_env.action_space)
+    training_env = make_atari_env(
         'Breakout-v4', n_envs=n_envs, vec_env_cls=env_cls, seed=0)
-    playGround = env_wrapper(playGround, n_stack=n_stack, log_path=log_dir,
-                             device=device_str, saving_freq=save_freq, model_path=model_dir,
-                             learning_rate=1e-6)
+    if rewards == "extrinsic":
+        training_env = VecFrameStack(training_env, n_stack=n_stack)
+    elif rewards == "intrinsic":
+        training_env = env_wrapper(training_env, n_stack=n_stack, log_path=log_dir,
+                                device=device_str, saving_freq=save_freq, model_path=model_dir,
+                                learning_rate=5e-6)
+    elif rewards == "both":
+        raise NotImplementedError
+    else:
+        raise ValueError(f"Invalid rewards argument: {rewards}")
+    
+    print(training_env.observation_space.shape)
 
-    print(playGround.observation_space.shape)
-
-    # Create feature extractor
-    icm = create_embeddings_module(n_input_channels=n_stack)
+    # Create feature extractor for A2C. May be pretrained, e.g. from an ICM module.
+    icm_feature_extractor = create_embeddings_module(n_input_channels=n_stack)
     if embeddings_load_path is not None:
-        icm.load_state_dict(th.load(embeddings_load_path))
-    kwargs = {"features_extractor_kwargs": {"icm_embeddings": icm},
+        icm_feature_extractor.load_state_dict(th.load(embeddings_load_path))
+    kwargs = {"features_extractor_kwargs": {"icm_embeddings": icm_feature_extractor},
               "features_extractor_class": IcmCnn}
-    laModel = A2C('CnnPolicy', playGround, policy_kwargs=kwargs,
+
+    a2c_model = A2C('CnnPolicy', training_env, policy_kwargs=kwargs,
                   verbose=1, tensorboard_log=log_dir, device=device_str)
 
-    laModel.learn(total_timesteps=total_steps, callback=checkpoint_callback)
+    a2c_model.learn(total_timesteps=total_steps, callback=checkpoint_callback)
 
 
 
