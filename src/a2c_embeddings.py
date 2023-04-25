@@ -53,6 +53,7 @@ class IcmCnn(BaseFeaturesExtractor):
         if icm_embeddings is not None:
             self.model = icm_embeddings
         else:
+            print(f"Constructing ICM CNN with {n_input_channels} input channels")
             self.cnn = nn.Sequential(
                 nn.Conv2d(n_input_channels, 32,
                           kernel_size=8, stride=4, padding=0),
