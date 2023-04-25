@@ -1,11 +1,8 @@
-from typing import Any, Dict, List, Optional, Type, Union
 from torch import nn
 import torch as th
 from gym import spaces
 from stable_baselines3.common.preprocessing import is_image_space
-from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
-from stable_baselines3.common.type_aliases import Schedule
 
 """
 To use: pass the ActorCriticIcmPolicy class to the A2C constructor, along with policy kwargs
