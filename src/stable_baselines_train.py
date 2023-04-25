@@ -78,9 +78,9 @@ if __name__ == "__main__":
     icm_feature_extractor = create_embeddings_module(n_input_channels=n_stack)
     if embeddings_load_path is not None:
         icm_feature_extractor.load_state_dict(th.load(embeddings_load_path))
-    # kwargs = {"features_extractor_kwargs": {"icm_embeddings": icm_feature_extractor},
-    #           "features_extractor_class": IcmCnn}
-    kwargs = {"features_extractor_class": NatureCNN}
+    kwargs = {"features_extractor_kwargs": {"icm_embeddings": icm_feature_extractor},
+              "features_extractor_class": IcmCnn}
+    # kwargs = {"features_extractor_class": NatureCNN}
 
     a2c_model = A2C('CnnPolicy', training_env, policy_kwargs=kwargs,
                   verbose=1, tensorboard_log=log_dir, device=device_str)
