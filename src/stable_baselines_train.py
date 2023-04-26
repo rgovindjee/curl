@@ -13,7 +13,7 @@ from a2c_embeddings import IcmCnn
 from stable_baselines3.common.torch_layers import NatureCNN
 
 # Save a checkpoint every set number of steps
-n_envs = 2  # Number of environments to run in parallel.
+n_envs = 4  # Number of environments to run in parallel.
 # in env.step() calls. This takes a long time, so we'll do it less often.
 save_freq = 500_000
 total_steps = 100_000_000  # in env.step() calls.
@@ -79,7 +79,8 @@ if __name__ == "__main__":
     if embeddings_load_path is not None:
         icm_feature_extractor.load_state_dict(th.load(embeddings_load_path))
     kwargs = {"features_extractor_kwargs": {"icm_embeddings": icm_feature_extractor},
-              "features_extractor_class": IcmCnn}
+              "features_extractor_class": IcmCnn,
+              "net_arch": []}
     # kwargs = {"features_extractor_class": NatureCNN}
 
     a2c_model = A2C('CnnPolicy', training_env, policy_kwargs=kwargs,

@@ -75,7 +75,7 @@ class IcmCnn(BaseFeaturesExtractor):
             self.linear = nn.Sequential(
                 nn.Linear(n_flatten, features_dim), nn.ReLU())
             self.model = nn.Sequential(self.cnn, self.linear)
-        summary(self.model, (n_input_channels, 84, 84))  # (batch_size, channels, height, width)
+        # summary(self.model, (n_input_channels, 84, 84))  # (batch_size, channels, height, width)
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         return self.model(observations)
